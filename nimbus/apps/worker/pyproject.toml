@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "nimbus-worker"
+version = "0.1.0"
+description = "Nimbus background worker"
+authors = ["baha.ghrissi@esprit.tn"]
+packages = [{ include = "nimbus_worker", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+sqlalchemy = "^2.0.32"
+asyncpg = "^0.29.0"
+redis = "^5.0.7"
+pydantic-settings = "^2.4.0"
+
+[dependency-groups]
+dev = [
+    "pytest (>=8.4.2,<9.0.0)",
+    "pytest-asyncio (>=1.2.0,<2.0.0)",
+    "pytest-cov (>=7.0.0,<8.0.0)",
+    "ruff (>=0.13.2,<0.14.0)",
+    "black (>=25.9.0,<26.0.0)",
+    "mypy (>=1.18.2,<2.0.0)"
+]

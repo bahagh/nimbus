@@ -1,0 +1,15 @@
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = ["E","F","I","UP","B","PL"]
+ignore = [
+  "B008",     # FastAPI's Depends in defaults is idiomatic
+  "B019",     # lru_cache-on-method warning (OK for our tiny verifier)
+  "PLR2004",  # magic numbers in simple assertions
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

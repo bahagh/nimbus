@@ -1,0 +1,41 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: '1.8.3'
+      - name: Install API deps
+        working-directory: apps/api
+        run: poetry install --no-interaction
+      - name: Lint API
+        working-directory: apps/api
+        run: poetry run ruff check .
+      - name: Typecheck API
+        working-directory: apps/api
+        run: poetry run mypy --config-file mypy.ini .
+      - name: Test API
+        working-directory: apps/api
+        run: poetry run pytest -q
+      - name: Install Worker deps
+        working-directory: apps/worker
+        run: poetry install --no-interaction
+      - name: Lint Worker
+        working-directory: apps/worker
+        run: poetry run ruff check .
+      - name: Typecheck Worker
+        working-directory: apps/worker
+        run: poetry run mypy --config-file mypy.ini .
+      - name: Test Worker
+        working-directory: apps/worker
+        run: poetry run pytest -q
