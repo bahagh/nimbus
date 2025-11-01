@@ -82,9 +82,9 @@ Nimbus is an enterprise-grade event ingestion and analytics API designed for hig
 
   ```sh
 
-```  docker compose -f deploy/docker/compose.dev.yml up -d --build
+```  docker compose -f deploy/docker/compose.dev.yml up -d --build```
 
-┌─────────────────────────────────────────────────────────────┐  ```
+┌─────────────────────────────────────────────────────────────┐  
 
 │                         Client Layer                         │4. **Access frontend:**
 
