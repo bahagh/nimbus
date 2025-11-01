@@ -21,9 +21,20 @@ async def create_project_endpoint(
     _claims: dict = Depends(require_jwt),
     session: AsyncSession = Depends(get_session),
 ):
-    project, key_id, key_secret = await create_project(session, body.name)
-    await session.commit()
-    return {"project": project, "api_key_id": key_id, "api_key_secret": key_secret}
+    import logging
+    import traceback
+    if not body.name or len(body.name) < 3:
+        raise HTTPException(status_code=400, detail="Project name must be at least 3 characters")
+    try:
+        project, key_id, key_secret = await create_project(session, body.name)
+        await session.commit()
+        logging.info(f"Project created: {project['id']} ({body.name})")
+        return {"project": project, "api_key_id": key_id, "api_key_secret": key_secret}
+    except Exception as e:
+        await session.rollback()
+        logging.error(f"Project creation failed for name {body.name}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Project creation failed: {str(e)}")
 
 
 @router.get("", response_model=ProjectList, summary="List projects")

@@ -15,5 +15,10 @@ async def metrics(
     _claims: dict = Depends(require_jwt),
     session: AsyncSession = Depends(get_session),
 ):
-    series = await get_event_count_series(session, project_id=project_id, bucket=bucket, limit=limit)
+    import uuid
+    try:
+        project_uuid = uuid.UUID(project_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid project_id (must be UUID)")
+    series = await get_event_count_series(session, project_id=str(project_uuid), bucket=bucket, limit=limit)
     return MetricsResponse(metric="events.count", bucket=bucket, series=[SeriesPoint(**p) for p in series])

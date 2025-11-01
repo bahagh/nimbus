@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 class LoginRequest(BaseModel):
-    username: str = Field(examples=["demo"])
+    email: str = Field(examples=["demo@example.com"])
     password: str = Field(examples=["demo123"])
 
 class TokenPair(BaseModel):

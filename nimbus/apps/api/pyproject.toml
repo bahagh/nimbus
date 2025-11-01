@@ -2,14 +2,14 @@
 name = "nimbus-api"
 version = "0.1.0"
 description = "Nimbus FastAPI backend"
-authors = ["baha.ghrissi@esprit.tn"]
+authors = ["Bahagh <baha.ghrissi@esprit.tn>"]
 package-mode = true
 packages = [{ include = "nimbus", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
 fastapi = "^0.115.0"
-uvicorn = {extras=["standard"], version="^0.30.0"}
+uvicorn = "^0.30.0"
 sqlalchemy = "^2.0.32"
 asyncpg = "^0.29.0"
 pydantic = "^2.8.2"
@@ -34,6 +34,7 @@ psycopg2-binary = "^2.9.9"
 email-validator = "^2.1.0"
 httpx = "^0.27.0"
 psycopg = {extras = ["binary"], version = "^3.2.10"}
+fastapi-limiter = "^0.1.6"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"

@@ -27,26 +27,37 @@ def _new_key_secret() -> str:
 # --- CRUD ------------------------------------------------------------------
 
 async def create_project(session: AsyncSession, name: str) -> tuple[Dict, str, str]:
+    from sqlalchemy import column
+    from datetime import datetime
+    
     api_key_id = _new_key_id()
     api_key_secret = _new_key_secret()
     api_key_hash = _hash_secret(api_key_secret)
 
     pid = uuid.uuid4()
+    now = datetime.utcnow()
+    
     stmt = insert(Project).values(
         id=pid,
         name=name,
         api_key_id=api_key_id,
         api_key_hash=api_key_hash,
-    ).returning(Project)
+    ).returning(
+        column("id"),
+        column("name"),
+        column("api_key_id"),
+        column("created_at"),
+        column("updated_at")
+    )
     res = await session.execute(stmt)
-    obj: Project = res.scalars().one()
+    row = res.one()
 
     out = {
-        "id": str(obj.id),
-        "name": obj.name,
-        "api_key_id": obj.api_key_id,
-        "created_at": obj.created_at,
-        "updated_at": obj.updated_at,
+        "id": str(row[0]),  # id
+        "name": row[1],  # name
+        "api_key_id": row[2],  # api_key_id
+        "created_at": row[3],  # created_at
+        "updated_at": row[4],  # updated_at
     }
     return out, api_key_id, api_key_secret
 

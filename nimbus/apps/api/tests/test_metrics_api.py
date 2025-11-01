@@ -1,13 +1,13 @@
 import json, time, os, datetime as dt
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from nimbus.main import app
 from nimbus.security.auth import create_token
 from tests.testutils import hmac_sig, ensure_project
 
 @pytest.mark.asyncio
 async def test_metrics_flow_after_ingest():
-    pid = await ensure_project()
+    pid, key_id = await ensure_project()
     # ingest a few events across the last couple minutes
     now = dt.datetime.now(dt.timezone.utc)
     events = [
@@ -18,11 +18,10 @@ async def test_metrics_flow_after_ingest():
     body = {"project_id": pid, "events": events}
     body_s = json.dumps(body, separators=(",", ":"))
     ts = int(time.time())
-    key_id = os.getenv("INGEST_API_KEY_ID", "local-key-id")
     secret = os.getenv("INGEST_API_KEY_SECRET", "local-super-secret")
     sig = hmac_sig(ts, "POST", "/v1/events", body_s, secret)
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         r1 = await ac.post(
             "/v1/events",
             headers={
@@ -41,8 +40,8 @@ async def test_metrics_flow_after_ingest():
             f"/v1/metrics?project_id={pid}&time_range=2 minutes&window=minute",
             headers={"Authorization": f"Bearer {token}"},
         )
-
-    assert r2.status_code == 200
+        assert r2.status_code == 200
     payload = r2.json()
-    assert isinstance(payload, list)
-    assert all("ts" in p and "value" in p for p in payload)
+    assert "series" in payload
+    assert isinstance(payload["series"], list)
+    assert all("ts" in p and "value" in p for p in payload["series"])

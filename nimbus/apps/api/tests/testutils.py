@@ -10,24 +10,25 @@ from nimbus.db import get_sessionmaker
 
 
 def hmac_sig(ts: int, method: str, path: str, body: str, secret: str) -> str:
-    bh = hashlib.sha256(body.encode()).hexdigest()
-    payload = f"{ts}.{method}.{path}.{bh}"
-    return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    # Match the server's HMAC calculation format
+    msg = f"{ts}:{method}:{path}:{body}"
+    return hmac.new(secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-async def ensure_project(project_id: str | None = None) -> str:
-    """Insert a project row if it doesn't exist; return its id."""
+async def ensure_project(project_id: str | None = None) -> tuple[str, str]:
+    """Insert a project row if it doesn't exist; return (project_id, api_key_id)."""
     pid = project_id or str(uuid.uuid4())
-    key_id = os.getenv("INGEST_API_KEY_ID", "local-key-id")
+    # Create unique key_id for each project to avoid UNIQUE constraint violation
+    key_id = f"test-key-{pid[:8]}"
     secret = os.getenv("INGEST_API_KEY_SECRET", "local-super-secret")
-    api_key_hash = hashlib.sha256(secret.encode()).hexdigest()
+    api_key_hash = hashlib.sha256(secret.encode()).digest()  # Use .digest() for bytes, not hexdigest()
 
     Session = get_sessionmaker()
     async with Session() as s, s.begin():
         # already there?
         exists = await s.execute(text("SELECT 1 FROM projects WHERE id = :id"), {"id": pid})
         if exists.scalar_one_or_none():
-            return pid
+            return pid, key_id
 
         # Detect dialect (sqlite vs postgres) without awaiting
         bind = s.get_bind()  # AsyncEngine, not awaitable
@@ -60,7 +61,7 @@ async def ensure_project(project_id: str | None = None) -> str:
             },
         )
 
-    return pid
+    return pid, key_id
 
 
 async def count_events(pid: str) -> int:

@@ -1,12 +1,12 @@
 import json, time, os, datetime as dt
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from nimbus.main import app
 from tests.testutils import hmac_sig, ensure_project, count_events
 
 @pytest.mark.asyncio
 async def test_ingest_event_success():
-    pid = await ensure_project()
+    pid, key_id = await ensure_project()
     body = {
         "project_id": pid,
         "events": [
@@ -15,11 +15,10 @@ async def test_ingest_event_success():
     }
     body_s = json.dumps(body, separators=(",", ":"))
     ts = int(time.time())
-    key_id = os.getenv("INGEST_API_KEY_ID", "local-key-id")
     secret = os.getenv("INGEST_API_KEY_SECRET", "local-super-secret")
     sig = hmac_sig(ts, "POST", "/v1/events", body_s, secret)
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         r = await ac.post(
             "/v1/events",
             headers={
@@ -33,6 +32,6 @@ async def test_ingest_event_success():
 
     assert r.status_code == 200
     data = r.json()
-    assert data["status"] == "accepted"
-    assert data["count"] == 1
+    assert data["accepted"] == 1
+    assert data["rejected"] == 0
     assert await count_events(pid) >= 1

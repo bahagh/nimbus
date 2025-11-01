@@ -5,6 +5,7 @@ from nimbus.models.base import Base, UUIDMixin, Timestamped
 
 class Project(Base, UUIDMixin, Timestamped):
     __tablename__ = "projects"
+    __table_args__ = {"extend_existing": True}
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     api_key_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     api_key_hash: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

@@ -1,4 +1,4 @@
-import datetime as dt
+import time
 import jwt
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -6,15 +6,18 @@ from nimbus.settings import settings
 
 _http_bearer = HTTPBearer(auto_error=False)
 
+def _now_epoch() -> int:
+    return int(time.time())  # UTC epoch seconds
+
 def _encode(payload: dict, ttl_seconds: int) -> str:
-    now = dt.datetime.utcnow()
+    now = _now_epoch()
     body = {
         **payload,
-        "iat": int(now.timestamp()),
-        "exp": int((now + dt.timedelta(seconds=ttl_seconds)).timestamp()),
+        "iat": now,
+        "exp": now + int(ttl_seconds),
         "iss": settings.app_name,
     }
-    return jwt.encode(body, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return jwt.encode(body, settings.get_jwt_secret(), algorithm=settings.jwt_algorithm)
 
 def create_access_token(sub: str) -> str:
     return _encode({"sub": sub, "typ": "access"}, settings.jwt_access_ttl_seconds)
@@ -24,7 +27,13 @@ def create_refresh_token(sub: str) -> str:
 
 def _decode(token: str) -> dict:
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(
+            token,
+            settings.get_jwt_secret(),
+            algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "iat", "iss"]},
+            leeway=5,  # small clock skew tolerance
+        )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except jwt.InvalidTokenError:

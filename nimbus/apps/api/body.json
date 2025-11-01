@@ -1,7 +1,0 @@
-{
-  "project_id": "a2838938-9bb9-41cc-b47d-08b5b2ae7d89",
-  "events": [
-    { "name": "page_view", "ts": "2025-09-27T21:53:22Z", "user_id": "user-123", "props": {"k":"v"} },
-    { "name": "signup",    "ts": "2025-09-27T21:53:23Z",                    "props": {"plan":"pro"} }
-  ]
-}

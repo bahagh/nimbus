@@ -2,6 +2,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # App
+    app_name: str = "Nimbus API"
+    
     # DB / cache
     database_url: str = "sqlite+aiosqlite:///:memory:"  # overridden by .env in real use
     redis_url: str = "redis://localhost:6379/0"

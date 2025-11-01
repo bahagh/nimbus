@@ -3,19 +3,22 @@ from functools import lru_cache
 
 import jwt
 
-from ..config import settings
+from nimbus.settings import settings
 from .oidc import OIDCVerifier
 
 
-def create_token(sub: str, ttl: int) -> str:
+def create_token(sub: str, ttl: int, typ: str = "access") -> str:
     now = int(time.time())
     payload = {
         "sub": sub,
         "iat": now,
         "exp": now + ttl,
-        "aud": settings.oidc_audience or "nimbus-local",
+        "iss": settings.app_name,
+        "typ": typ,
     }
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_alg)
+    # Handle both Settings with get_jwt_secret() method and plain string jwt_secret
+    secret = settings.get_jwt_secret() if hasattr(settings, 'get_jwt_secret') else settings.jwt_secret
+    return jwt.encode(payload, secret, algorithm=settings.jwt_alg)
 
 
 @lru_cache(maxsize=8)
@@ -29,15 +32,16 @@ def decode_token(token: str) -> dict | None:
         try:
             return _get_verifier(settings.oidc_issuer, settings.oidc_audience).verify(token)
         except Exception:
-            pass  # fall back to local HS*
+            pass
 
     # Fallback to local HS256/HS512
     try:
+        # Handle both Settings with get_jwt_secret() method and plain string jwt_secret
+        secret = settings.get_jwt_secret() if hasattr(settings, 'get_jwt_secret') else settings.jwt_secret
         return jwt.decode(
             token,
-            settings.jwt_secret,
+            secret,
             algorithms=[settings.jwt_alg],
-            audience=settings.oidc_audience or "nimbus-local",
         )
     except Exception:
         return None

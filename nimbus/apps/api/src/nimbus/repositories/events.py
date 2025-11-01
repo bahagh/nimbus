@@ -1,182 +1,144 @@
 from __future__ import annotations
-from typing import Optional, List, Dict, Tuple
-from datetime import datetime, timezone
-from sqlalchemy import select, and_, func, cast
-from sqlalchemy.dialects.postgresql import insert as pg_insert, JSONB
-from sqlalchemy import insert as sa_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+import uuid as _uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from nimbus.models.event import Event
 
-
-async def bulk_insert_events(session: AsyncSession, records: list[dict]):
+async def bulk_insert_events(session: AsyncSession, records: List[Dict[str, Any]]) -> int:
+    """
+    Insert many events. Skips duplicates if idempotency_key is provided (idempotent).
+    """
     if not records:
-        return
-    cleaned = [{k: v for k, v in r.items() if not (k == "seq" and v is None)} for r in records]
+        return 0
 
-    if session.bind and session.bind.dialect.name == "postgresql":
-        has_seq = any(r.get("seq") is not None for r in cleaned)
-        stmt = pg_insert(Event).values(cleaned)
-        if has_seq:
-            # if you later add a unique index (project_id, seq), do nothing on conflicts
-            stmt = stmt.on_conflict_do_nothing(index_elements=[Event.project_id, Event.seq])
-        await session.execute(stmt)
-        return
+    # Ensure each record has a UUID id
+    for r in records:
+        r.setdefault("id", _uuid.uuid4())
+    
+    # Check if any record has idempotency_key - if so, use ON CONFLICT
+    has_idempotency_key = any(r.get("idempotency_key") is not None for r in records)
+    
+    stmt = pg_insert(Event).values(records)
+    
+    if has_idempotency_key:
+        # Use ON CONFLICT only when idempotency_key is provided
+        # Note: The constraint uses COALESCE(user_id, '') and WHERE idempotency_key IS NOT NULL
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[Event.project_id, Event.name, Event.ts, Event.user_id, Event.idempotency_key]
+        )
+    
+    stmt = stmt.returning(Event.id)
 
-    # SQLite (dev only)
-    stmt = sa_insert(Event).values(cleaned)
-    await session.execute(stmt)
-
-
-def _normalize_dt(dt: Optional[datetime]) -> Optional[datetime]:
-    """
-    Convert aware datetimes to UTC-naive to match TIMESTAMP WITHOUT TIME ZONE columns.
-    Leave naive as-is.
-    """
-    if dt is None:
-        return None
-    if dt.tzinfo is not None:
-        return dt.astimezone(timezone.utc).replace(tzinfo=None)
-    return dt
-
-
-def _apply_filters(
-    stmt,
-    *,
-    project_id: str,
-    name: Optional[List[str]] = None,
-    user_id: Optional[str] = None,
-    since: Optional[datetime] = None,
-    until: Optional[datetime] = None,
-    props_contains: Optional[dict] = None,
-):
-    since = _normalize_dt(since)
-    until = _normalize_dt(until)
-
-    conds = [Event.project_id == project_id]
-    if name:
-        conds.append(Event.name.in_(name))
-    if user_id:
-        conds.append(Event.user_id == user_id)
-    if since:
-        conds.append(Event.ts >= since)
-    if until:
-        conds.append(Event.ts < until)
-    if props_contains:
-        stmt = stmt.where(cast(Event.props, JSONB).contains(props_contains))
-    if conds:
-        stmt = stmt.where(and_(*conds))
-    return stmt
-
+    res = await session.execute(stmt)
+    inserted = len(res.fetchall())
+    # Remove duplicate commit - let the service handle it
+    return inserted
 
 async def list_events_offset(
     session: AsyncSession,
-    *,
     project_id: str,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int,
+    offset: int,
     name: Optional[List[str]] = None,
     user_id: Optional[str] = None,
     since: Optional[datetime] = None,
     until: Optional[datetime] = None,
-    props_contains: Optional[dict] = None,
-) -> Tuple[List[Dict], int]:
+    props_contains: Optional[Dict[str, Any]] = None,
+):
+    q = select(Event).where(Event.project_id == _uuid.UUID(project_id))
+    if name:
+        q = q.where(Event.name.in_(name))
+    if user_id:
+        q = q.where(Event.user_id == user_id)
+    if since:
+        q = q.where(Event.ts >= since)
+    if until:
+        q = q.where(Event.ts < until)
+    if props_contains:
+        from sqlalchemy import func
+        q = q.where(func.jsonb_contains(Event.props, props_contains))  # PG jsonb @> equivalent
+
     # total
-    count_stmt = select(func.count()).select_from(Event)
-    count_stmt = _apply_filters(
-        count_stmt,
-        project_id=project_id,
-        name=name,
-        user_id=user_id,
-        since=since,
-        until=until,
-        props_contains=props_contains,
-    )
-    total = (await session.execute(count_stmt)).scalar_one()
+    total = (await session.execute(q.with_only_columns(Event.id))).unique().rowcount or 0
 
     # page
-    stmt = select(Event)
-    stmt = _apply_filters(
-        stmt,
-        project_id=project_id,
-        name=name,
-        user_id=user_id,
-        since=since,
-        until=until,
-        props_contains=props_contains,
-    )
-    stmt = stmt.order_by(Event.ts.desc(), Event.id.desc()).limit(limit).offset(offset)
-    rows = (await session.execute(stmt)).scalars().all()
+    q = q.order_by(Event.ts.desc(), Event.id.desc()).limit(limit).offset(offset)
+    rows = (await session.execute(q)).scalars().all()
 
+    # serialize
     items = [
         {
-            "id": str(e.id),
-            "project_id": str(e.project_id),
-            "name": e.name,
-            "ts": e.ts,
-            "user_id": e.user_id,
-            "seq": e.seq,
-            "props": e.props,
-            "created_at": e.created_at,
-            "updated_at": e.updated_at,
+            "id": str(r.id),
+            "project_id": str(r.project_id),
+            "name": r.name,
+            "ts": r.ts.isoformat() + "Z",
+            "user_id": r.user_id,
+            "props": r.props,
+            "seq": r.seq,
+            "idempotency_key": r.idempotency_key,
+            "created_at": r.created_at.isoformat(),
         }
-        for e in rows
+        for r in rows
     ]
-    return items, int(total)
-
+    return items, total
 
 async def list_events_keyset(
     session: AsyncSession,
-    *,
     project_id: str,
-    limit: int = 50,
-    after_ts: Optional[datetime] = None,
-    after_id: Optional[str] = None,
+    limit: int,
+    after_ts: datetime,
+    after_id: str,
     name: Optional[List[str]] = None,
     user_id: Optional[str] = None,
     since: Optional[datetime] = None,
     until: Optional[datetime] = None,
-    props_contains: Optional[dict] = None,
-) -> Tuple[List[Dict], Optional[Dict]]:
-    after_ts = _normalize_dt(after_ts)
+    props_contains: Optional[Dict[str, Any]] = None,
+):
+    q = select(Event).where(Event.project_id == _uuid.UUID(project_id))
+    if name:
+        q = q.where(Event.name.in_(name))
+    if user_id:
+        q = q.where(Event.user_id == user_id)
+    if since:
+        q = q.where(Event.ts >= since)
+    if until:
+        q = q.where(Event.ts < until)
+    if props_contains:
+        from sqlalchemy import func
+        q = q.where(func.jsonb_contains(Event.props, props_contains))
 
-    stmt = select(Event)
-    stmt = _apply_filters(
-        stmt,
-        project_id=project_id,
-        name=name,
-        user_id=user_id,
-        since=since,
-        until=until,
-        props_contains=props_contains,
-    )
+    # keyset (ts DESC, id DESC)
+    q = q.where(
+        (Event.ts < after_ts) |
+        ((Event.ts == after_ts) & (Event.id < _uuid.UUID(after_id)))
+    ).order_by(Event.ts.desc(), Event.id.desc()).limit(limit)
 
-    if after_ts and after_id:
-        stmt = stmt.where(
-            (Event.ts < after_ts) | ((Event.ts == after_ts) & (Event.id < after_id))
-        )
-
-    stmt = stmt.order_by(Event.ts.desc(), Event.id.desc()).limit(limit)
-    rows = (await session.execute(stmt)).scalars().all()
-
+    rows = (await session.execute(q)).scalars().all()
     items = [
         {
-            "id": str(e.id),
-            "project_id": str(e.project_id),
-            "name": e.name,
-            "ts": e.ts,
-            "user_id": e.user_id,
-            "seq": e.seq,
-            "props": e.props,
-            "created_at": e.created_at,
-            "updated_at": e.updated_at,
+            "id": str(r.id),
+            "project_id": str(r.project_id),
+            "name": r.name,
+            "ts": r.ts.isoformat() + "Z",
+            "user_id": r.user_id,
+            "props": r.props,
+            "seq": r.seq,
+            "idempotency_key": r.idempotency_key,
+            "created_at": r.created_at.isoformat(),
         }
-        for e in rows
+        for r in rows
     ]
-
     next_cursor = None
     if items:
-        last = items[-1]
-        next_cursor = {"after_ts": last["ts"].isoformat(), "after_id": last["id"]}
-
+        last = rows[-1]
+        next_cursor = {
+            "after_ts": last.ts.isoformat() + "Z",
+            "after_id": str(last.id),
+        }
     return items, next_cursor

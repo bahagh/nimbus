@@ -3,31 +3,23 @@ import os
 import pytest
 
 # ---- Test env defaults ----
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./tests.db")
-os.environ.setdefault("JWT_SECRET", "testsecret")
-os.environ.setdefault("JWT_ALG", "HS256")
-os.environ.setdefault("RATE_LIMIT_PER_MINUTE", "1000")
-os.environ.setdefault("INGEST_API_KEY_ID", "local-key-id")
-os.environ.setdefault("INGEST_API_KEY_SECRET", "local-super-secret")
+os.environ["NIMBUS_DATABASE_URL"] = "postgresql+asyncpg://postgres:baha123@localhost:5432/nimbus_test"
+os.environ.setdefault("NIMBUS_JWT_SECRET", "testsecret-must-be-at-least-32-chars-long-for-security")
+os.environ.setdefault("NIMBUS_JWT_ALGORITHM", "HS256")
+os.environ.setdefault("NIMBUS_RATE_LIMIT_PER_MINUTE", "1000")
+os.environ.setdefault("NIMBUS_INGEST_API_KEY_ID", "local-key-id")
+os.environ.setdefault("NIMBUS_INGEST_API_KEY_SECRET", "local-super-secret")
+os.environ.setdefault("NIMBUS_REDIS_URL", "redis://localhost:6379/0")
+# Use NullPool to avoid connection pooling issues in tests
+os.environ.setdefault("NIMBUS_USE_NULL_POOL", "true")
 
-# Clean stale sqlite file between runs to avoid leftover schema/content
-if os.environ["DATABASE_URL"].startswith("sqlite+aiosqlite:///"):
-    path = os.environ["DATABASE_URL"].replace("sqlite+aiosqlite:///", "", 1)
-    if path and os.path.exists(path):
-        try:
-            os.remove(path)
-        except OSError:
-            pass
-
-from nimbus.db import get_engine  # noqa: E402
-from nimbus.models.base import Base  # noqa: E402
-
+from src.nimbus.db import get_engine  # noqa: E402
+from src.nimbus.models.base import Base  # noqa: E402
 # Import models so they register with Base.metadata
-import nimbus.models.user    # noqa: F401,E402
-import nimbus.models.project # noqa: F401,E402
-import nimbus.models.event   # noqa: F401,E402
-
-from nimbus.main import app  # noqa: F401,E402  # keep app import working for tests
+import src.nimbus.models.user    # noqa: F401,E402
+import src.nimbus.models.project # noqa: F401,E402
+import src.nimbus.models.event   # noqa: F401,E402
+from src.nimbus.main import app  # noqa: F401,E402  # keep app import working for tests
 
 import pytest_asyncio
 
@@ -37,19 +29,13 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def _create_schema():
-    """Create/drop all tables once per test session using the running event loop."""
-    engine = get_engine()
-    async with engine.begin() as conn:
-        # enforce FKs on sqlite if supported
-        try:
-            await conn.exec_driver_sql("PRAGMA foreign_keys=ON")
-        except Exception:
-            pass
-        await conn.run_sync(Base.metadata.create_all)
-
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def cleanup_db_connections():
+    """Clean up database connections after each test."""
     yield
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    # Clean up after the test finishes
+    from src.nimbus.db import reset_engine
+    try:
+        reset_engine()
+    except Exception:
+        pass
