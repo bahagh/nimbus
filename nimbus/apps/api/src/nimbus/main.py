@@ -22,9 +22,17 @@ limiter = Limiter(key_func=get_remote_address) if settings.rate_limit_enabled el
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
-    description="Nimbus API for event ingestion and metrics",
-    contact={"name": "Nimbus"},
+    version="0.1.0-beta.1",
+    description="Open-source event analytics API - Alternative to Segment & Mixpanel",
+    contact={
+        "name": "Nimbus",
+        "url": "https://github.com/bahagh/nimbus",
+        "email": "baha.ghrissi@esprit.tn"
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://github.com/bahagh/nimbus/blob/master/LICENSE",
+    },
     debug=settings.debug,
 )
 

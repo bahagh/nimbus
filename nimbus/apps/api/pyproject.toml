@@ -1,8 +1,25 @@
 [tool.poetry]
-name = "nimbus-api"
-version = "0.1.0"
-description = "Nimbus FastAPI backend"
+name = "nimbus-analytics"
+version = "0.1.0-beta.1"
+description = "Open-source alternative to Segment & Mixpanel - High-performance event analytics backend (Dashboard coming Q1 2026)"
 authors = ["Bahagh <baha.ghrissi@esprit.tn>"]
+license = "MIT"
+readme = "README_PYPI.md"
+homepage = "https://github.com/bahagh/nimbus"
+repository = "https://github.com/bahagh/nimbus"
+documentation = "https://github.com/bahagh/nimbus#readme"
+keywords = ["analytics", "fastapi", "events", "metrics", "postgresql", "redis", "async"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Database",
+]
 package-mode = true
 packages = [{ include = "nimbus", from = "src" }]
 

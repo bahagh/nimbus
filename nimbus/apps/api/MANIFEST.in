@@ -1,0 +1,11 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include src/nimbus *.py
+recursive-include alembic *.py *.mako *.ini
+prune tests
+prune **/__pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude *.bak
