@@ -6,6 +6,7 @@
 
 *High-performance event analytics platform built with modern async Python. Own your data, save 90% on costs.*
 
+[![PyPI](https://img.shields.io/pypi/v/nimbus-analytics.svg)](https://pypi.org/project/nimbus-analytics/)
 [![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-00a393.svg)](https://fastapi.tiangolo.com/)
 [![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-d71f00.svg)](https://www.sqlalchemy.org/)
@@ -270,6 +271,17 @@ open http://localhost:8000/docs
 - **Poetry**: Dependency management
 
 ## 🚀 Quick Start
+
+### 📦 Installation
+
+**Install from PyPI:**
+
+```bash
+pip install nimbus-analytics
+```
+
+> **PyPI Package:** https://pypi.org/project/nimbus-analytics/  
+> **Version:** 0.1.0-beta.1 (Production-ready backend API)
 
 ### Prerequisites
 
@@ -1016,13 +1028,14 @@ docker-compose up -d --scale api=3
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## Author
+## 👥 Contributors
 
-**Baha Ghrissi**
-- GitHub: [@bahagh](https://github.com/bahagh)
-- Email: baha.ghrissi@esprit.tn
+**Core Team:**
+- **Baha Ghrissi** ([@bahagh](https://github.com/bahagh)) - Creator & Lead Developer
 
-## Acknowledgments
+**Want to contribute?** We welcome contributions! See the [Contributing](#-contributing) section above.
+
+## 🙏 Acknowledgments
 
 - FastAPI for the excellent async web framework
 - SQLAlchemy team for the powerful ORM
