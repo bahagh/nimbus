@@ -24,6 +24,12 @@ wheels/
 pip-log.txt
 pip-delete-this-directory.txt
 
+# Setup tools
+*.egg-info/
+.eggs/
+dist/
+build/
+
 # Virtual Environments
 .env
 .venv
