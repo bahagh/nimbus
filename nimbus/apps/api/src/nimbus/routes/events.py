@@ -19,7 +19,7 @@ from nimbus.repositories.events import (
 
 router = APIRouter(prefix="/v1", tags=["events"])
 
-# Rate limiter
+# Rate limiter - enabled based on settings
 limiter = Limiter(key_func=get_remote_address) if settings.rate_limit_enabled else None
 
 

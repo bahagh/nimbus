@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Dict, Any
-from uuid import uuid4
+from uuid import uuid4, UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,10 +29,13 @@ def _to_dt(ts: Any) -> datetime:
 async def ingest_events(session: AsyncSession, project_id: str, events: List[Dict[str, Any]]) -> int:
     """Validate/shape records, insert, and COMMIT."""
     records: List[Dict[str, Any]] = []
+    # Convert project_id string to UUID
+    project_uuid = UUID(project_id)
+    
     for e in events:
         records.append({
             "id": e.get("id") or uuid4(),
-            "project_id": project_id,
+            "project_id": project_uuid,
             "name": e["name"],
             "ts": _to_dt(e.get("ts") or datetime.now(timezone.utc)),
             "props": e.get("props", {}),

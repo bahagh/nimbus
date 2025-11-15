@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from nimbus.schemas.metrics import MetricsResponse, SeriesPoint
 from nimbus.security.jwt import require_jwt

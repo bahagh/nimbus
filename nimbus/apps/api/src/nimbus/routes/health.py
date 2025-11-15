@@ -40,18 +40,25 @@ async def detailed_health():
         overall_healthy = False
     
     # Redis health check
-    try:
-        await redis.ping()
+    if redis is None:
         health_status["checks"]["redis"] = {
-            "status": "ok",
-            "message": "Redis connection successful"
+            "status": "warning",
+            "message": "Redis not configured (optional feature)"
         }
-    except Exception as e:
-        health_status["checks"]["redis"] = {
-            "status": "error",
-            "message": f"Redis connection failed: {str(e)}"
-        }
-        overall_healthy = False
+        # Don't mark as unhealthy - Redis is optional
+    else:
+        try:
+            await redis.ping()
+            health_status["checks"]["redis"] = {
+                "status": "ok",
+                "message": "Redis connection successful"
+            }
+        except Exception as e:
+            health_status["checks"]["redis"] = {
+                "status": "warning",
+                "message": f"Redis connection failed: {str(e)} (non-critical)"
+            }
+            # Don't mark as unhealthy - Redis is optional
     
     # Update overall status
     health_status["status"] = "ok" if overall_healthy else "error"

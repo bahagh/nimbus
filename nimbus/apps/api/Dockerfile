@@ -36,14 +36,20 @@ COPY poetry.lock ./poetry.lock
 # Development stage
 FROM base as development
 
-# Install dependencies including dev dependencies
-RUN poetry install && rm -rf $POETRY_CACHE_DIR
-
-# Copy all source code and required files
+# Copy all source code and required files first
 COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./alembic.ini
 COPY wait_for_db_and_migrate.sh ./wait_for_db_and_migrate.sh
+
+# Configure Poetry to create virtualenv in project
+RUN poetry config virtualenvs.in-project true
+
+# Install dependencies including dev dependencies
+RUN poetry install
+
+# Don't remove cache - it contains the virtualenv!
+# RUN rm -rf $POETRY_CACHE_DIR
 
 # Set Python path
 ENV PYTHONPATH=/app/src

@@ -12,8 +12,7 @@ class IngestEvent(BaseModel):
         ..., 
         min_length=1, 
         max_length=200,
-        pattern=r'^[a-zA-Z0-9_.-]+$',
-        description="Event name - alphanumeric, underscore, dot, dash only"
+        description="Event name - supports Unicode characters"
     )
     ts: datetime = Field(..., description="Event timestamp in ISO 8601 format")
     user_id: Optional[str] = Field(
@@ -38,10 +37,14 @@ class IngestEvent(BaseModel):
         if not v or not v.strip():
             raise ValueError('Event name cannot be empty')
         
-        # Sanitize name
-        sanitized = re.sub(r'[^a-zA-Z0-9_.-]', '', v.strip())
+        # Basic sanitization - remove only control characters
+        sanitized = re.sub(r'[\x00-\x1f\x7f]', '', v.strip())
         if not sanitized:
             raise ValueError('Event name contains only invalid characters')
+        
+        # Truncate if too long
+        if len(sanitized) > 200:
+            sanitized = sanitized[:200]
         
         return sanitized
 

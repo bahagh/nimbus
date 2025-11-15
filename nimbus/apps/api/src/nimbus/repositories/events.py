@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert
 
 from nimbus.models.event import Event
@@ -20,19 +20,11 @@ async def bulk_insert_events(session: AsyncSession, records: List[Dict[str, Any]
     # Ensure each record has a UUID id
     for r in records:
         r.setdefault("id", _uuid.uuid4())
-    
-    # Check if any record has idempotency_key - if so, use ON CONFLICT
-    has_idempotency_key = any(r.get("idempotency_key") is not None for r in records)
+        # Remove idempotency_key if column doesn't exist yet (migration not applied)
+        if "idempotency_key" in r and r["idempotency_key"] is None:
+            del r["idempotency_key"]
     
     stmt = pg_insert(Event).values(records)
-    
-    if has_idempotency_key:
-        # Use ON CONFLICT only when idempotency_key is provided
-        # Note: The constraint uses COALESCE(user_id, '') and WHERE idempotency_key IS NOT NULL
-        stmt = stmt.on_conflict_do_nothing(
-            index_elements=[Event.project_id, Event.name, Event.ts, Event.user_id, Event.idempotency_key]
-        )
-    
     stmt = stmt.returning(Event.id)
 
     res = await session.execute(stmt)
@@ -61,11 +53,11 @@ async def list_events_offset(
     if until:
         q = q.where(Event.ts < until)
     if props_contains:
-        from sqlalchemy import func
         q = q.where(func.jsonb_contains(Event.props, props_contains))  # PG jsonb @> equivalent
 
-    # total
-    total = (await session.execute(q.with_only_columns(Event.id))).unique().rowcount or 0
+    # total count
+    count_q = q.with_only_columns(func.count()).order_by(None)
+    total = (await session.execute(count_q)).scalar() or 0
 
     # page
     q = q.order_by(Event.ts.desc(), Event.id.desc()).limit(limit).offset(offset)
@@ -81,8 +73,8 @@ async def list_events_offset(
             "user_id": r.user_id,
             "props": r.props,
             "seq": r.seq,
-            "idempotency_key": r.idempotency_key,
-            "created_at": r.created_at.isoformat(),
+            "idempotency_key": getattr(r, "idempotency_key", None),
+            "created_at": r.created_at.isoformat() if hasattr(r, 'created_at') and r.created_at else None,
         }
         for r in rows
     ]
@@ -110,7 +102,6 @@ async def list_events_keyset(
     if until:
         q = q.where(Event.ts < until)
     if props_contains:
-        from sqlalchemy import func
         q = q.where(func.jsonb_contains(Event.props, props_contains))
 
     # keyset (ts DESC, id DESC)
@@ -129,8 +120,8 @@ async def list_events_keyset(
             "user_id": r.user_id,
             "props": r.props,
             "seq": r.seq,
-            "idempotency_key": r.idempotency_key,
-            "created_at": r.created_at.isoformat(),
+            "idempotency_key": getattr(r, "idempotency_key", None),
+            "created_at": r.created_at.isoformat() if hasattr(r, 'created_at') and r.created_at else None,
         }
         for r in rows
     ]

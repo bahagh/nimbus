@@ -3,9 +3,12 @@ services:
     build:
       context: ../../apps/api
       dockerfile: Dockerfile
+      target: development
     container_name: nimbus-api
     env_file:
       - ../../apps/api/.env
+    environment:
+      - RATE_LIMIT_ENABLED=false
     ports:
       - "8000:8000"
     depends_on:

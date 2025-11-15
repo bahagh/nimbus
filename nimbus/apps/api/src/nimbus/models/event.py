@@ -14,7 +14,7 @@ class Event(Base, UUIDMixin, Timestamped):
     props: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     user_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     seq: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    # NEW: optional idempotency key used for dedupe
-    idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # NOTE: idempotency_key column doesn't exist yet in database (migration pending)
+    # idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     __table_args__ = {"extend_existing": True}

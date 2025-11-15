@@ -104,13 +104,7 @@ async def cleanup_database():
     _sessionmaker = None
 
 def reset_engine():
-    """Reset engine and sessionmaker (for tests)"""
-    global _engine, _sessionmaker
-    _engine = None
-    _sessionmaker = None
-
-def reset_engine():
-    """Synchronously reset the engine and sessionmaker - for tests only"""
+    """Reset engine and sessionmaker (for tests only)"""
     global _engine, _sessionmaker
     _engine = None
     _sessionmaker = None

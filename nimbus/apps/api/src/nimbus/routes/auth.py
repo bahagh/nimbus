@@ -9,17 +9,22 @@ import hashlib
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 # User registration endpoint
-@router.post("/register", summary="Register a new user")
+@router.post("/register", status_code=status.HTTP_201_CREATED, summary="Register a new user")
 async def register(body: LoginRequest, session=Depends(get_session)):
     import re
+    import logging
+    
     if not body.email or not body.password:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email and password required")
+    
     # Basic email format check
     if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", body.email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email format")
+    
     # Password complexity: min 8 chars, 1 uppercase, 1 lowercase, 1 digit
     if len(body.password) < 8 or not re.search(r"[A-Z]", body.password) or not re.search(r"[a-z]", body.password) or not re.search(r"[0-9]", body.password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 8 characters, include uppercase, lowercase, and a digit")
+    
     # Check if user exists
     existing = await session.execute(
         text("SELECT * FROM users WHERE email = :email"), {"email": body.email}
@@ -27,24 +32,20 @@ async def register(body: LoginRequest, session=Depends(get_session)):
     user_row = existing.first()
     if user_row:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
-    # Hash password
-    import hashlib, logging
+    
+    # Hash password using SHA-256
     hashed = hashlib.sha256(body.password.encode()).digest()
-    try:
-        # Use direct SQL for user creation (as in working script)
-        result = await session.execute(
-            text("INSERT INTO users (email, hashed_password) VALUES (:email, :hashed_password) RETURNING id, email"),
-            {"email": body.email, "hashed_password": hashed}
-        )
-        await session.commit()
-        inserted = result.first()
-        logging.warning(f"Register: user {body.email} created successfully, inserted={inserted}")
-        return {"email": body.email, "status": "created", "db": str(inserted) if inserted else None}
-    except Exception as e:
-        import traceback
-        await session.rollback()
-        logging.error(f"Register: failed to create user {body.email}: {e}\n{traceback.format_exc()}")
-        return {"error": str(e), "trace": traceback.format_exc()}
+    
+    # Insert user into database
+    result = await session.execute(
+        text("INSERT INTO users (email, hashed_password) VALUES (:email, :hashed_password) RETURNING id, email"),
+        {"email": body.email, "hashed_password": hashed}
+    )
+    await session.commit()
+    inserted = result.first()
+    
+    logging.info(f"User registered successfully: {body.email}")
+    return {"email": body.email, "status": "created"}
 
 @router.post("/login", response_model=TokenPair, summary="Issue access and refresh tokens (demo)")
 async def login(body: LoginRequest, session=Depends(get_session)):
@@ -86,24 +87,4 @@ async def refresh(_claims=Depends(require_refresh_jwt)):
         refresh_token=create_refresh_token(sub=sub),
     )
 
-@router.post("/debug-db-write", summary="Debug DB write access")
-async def debug_db_write(session=Depends(get_session)):
-    import hashlib, logging
-    from sqlalchemy import text
-    email = "debugtest@example.com"
-    password = "debugpass123"
-    hashed = hashlib.sha256(password.encode()).digest()
-    try:
-        result = await session.execute(
-            text("INSERT INTO users (username, email, hashed_password) VALUES (:username, :email, :hashed_password) RETURNING id, email"),
-            {"username": email, "email": email, "hashed_password": hashed}
-        )
-        await session.commit()
-        inserted = result.first()
-        logging.warning(f"Debug DB Write: user {email} created, inserted={inserted}")
-        return {"email": email, "status": "created", "db": str(inserted) if inserted else None}
-    except Exception as e:
-        import traceback
-        await session.rollback()
-        logging.error(f"Debug DB Write: failed to create user {email}: {e}\n{traceback.format_exc()}")
-        return {"error": str(e), "trace": traceback.format_exc()}
+

@@ -46,7 +46,7 @@ class Settings(BaseSettings):
             except Exception:
                 self.allowed_origins = [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
     rate_limit_enabled: bool = Field(default=True, description="Enable rate limiting")
-    rate_limit_per_minute: int = Field(default=1000, ge=1, le=10000)
+    rate_limit_per_minute: int = Field(default=10000, ge=1, le=100000)
     
     # Monitoring and Observability
     enable_metrics: bool = Field(default=True, description="Enable Prometheus metrics")
